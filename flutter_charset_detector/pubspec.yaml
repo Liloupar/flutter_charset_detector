@@ -10,9 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_charset_detector_android: ^3.0.0
-  # flutter_charset_detector_android:
-  #   path: ../flutter_charset_detector_android
+  # flutter_charset_detector_android: ^3.0.0
+  flutter_charset_detector_android:
+    git:
+      url: https://github.com/Liloupar/flutter_charset_detector.git
+      path: flutter_charset_detector_android
   flutter_charset_detector_darwin: ^1.1.0
   # flutter_charset_detector_darwin:
   #   path: ../flutter_charset_detector_darwin
