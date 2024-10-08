@@ -54,6 +54,15 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_charset_detector_android:
+    dependency: "direct main"
+    description:
+      path: flutter_charset_detector_android
+      ref: HEAD
+      resolved-ref: ad60753ac5751fdde2cdbb8ba5696ffc9203254d
+      url: "https://github.com/Liloupar/flutter_charset_detector.git"
+    source: git
+    version: "3.0.0"
   flutter_charset_detector_darwin:
     dependency: "direct main"
     description:
