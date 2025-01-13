@@ -15,9 +15,12 @@ dependencies:
     git:
       url: https://github.com/Liloupar/flutter_charset_detector.git
       path: flutter_charset_detector_android
-  flutter_charset_detector_darwin: ^1.1.0
-  # flutter_charset_detector_darwin:
-  #   path: ../flutter_charset_detector_darwin
+  # flutter_charset_detector_darwin: ^1.1.0
+  flutter_charset_detector_darwin:
+    git:
+      url: https://github.com/Liloupar/flutter_charset_detector.git
+      path: flutter_charset_detector_darwin
+    # path: ../flutter_charset_detector_darwin
   # flutter_charset_detector_web: ^1.2.0
   # flutter_charset_detector_web:
   #   path: ../flutter_charset_detector_web
