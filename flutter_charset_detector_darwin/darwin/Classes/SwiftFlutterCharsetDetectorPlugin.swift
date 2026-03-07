@@ -52,7 +52,12 @@ public class SwiftFlutterCharsetDetectorPlugin: NSObject, FlutterPlugin {
             return
         }
         let nsEncoding = CFStringConvertEncodingToNSStringEncoding(encoding)
-        var decoded = NSString(data: data.data, encoding: nsEncoding)
+        var decoded: NSString?
+
+        // 针对 UTF-8 的容错
+        if decoded == nil && encoding == CFStringBuiltInEncodings.UTF8.rawValue {
+            decoded = String(decoding: data.data, as: UTF8.self) as NSString
+        }
         if decoded == nil {
             print("The data could not be decoded, Detected charset: \(encodingName)")
             if encodingName == "GB18030" {

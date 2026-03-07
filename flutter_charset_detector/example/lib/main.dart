@@ -7,7 +7,7 @@ import 'package:flutter_charset_detector/flutter_charset_detector.dart';
 
 void main() => runApp(const MyApp());
 
-const _kAssetName = 'assets/sjis-example.txt';
+const _kAssetName = 'assets/厄尔尼诺现象.txt';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -126,7 +126,7 @@ class _LoadedTextCard extends StatelessWidget {
             color: Colors.grey.shade100,
             borderRadius: const BorderRadius.all(Radius.circular(2)),
           ),
-          child: Text(snapshot.data?.trim() ?? snapshot.error.toString()),
+          child: Text(snapshot.data?.trim().substring(0, 100) ?? snapshot.error.toString()),
         ),
       ),
     );
