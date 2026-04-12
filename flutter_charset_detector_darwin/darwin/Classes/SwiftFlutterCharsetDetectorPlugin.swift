@@ -46,19 +46,25 @@ public class SwiftFlutterCharsetDetectorPlugin: NSObject, FlutterPlugin {
             // Elsewhere in the plugin we use the term "charset" instead of
             // "encoding", but for consistency with iOS APIs we use the term in a
             // limited capacity here
-            guard let encodingName = UniversalDetector.encodingAsString(with: inputData) else {
+            guard var encodingName = UniversalDetector.encodingAsString(with: inputData) else {
                 DispatchQueue.main.async {
                     result(FlutterError(code: "DetectionFailed", message: "The charset could not be detected", details: nil))
                 }
                 return
             }
 
-            let encoding = CFStringConvertIANACharSetNameToEncoding(encodingName as CFString)
-            guard encoding != kCFStringEncodingInvalidId else {
-                DispatchQueue.main.async {
-                    result(FlutterError(code: "UnsupportedCharset", message: "The detected charset \(encodingName) is not supported.", details: nil))
+            var encoding = CFStringConvertIANACharSetNameToEncoding(encodingName as CFString)
+            if encoding == kCFStringEncodingInvalidId {
+                if encodingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    print("Detected charset is empty or whitespace, falling back to UTF-8")
+                    encodingName = "UTF-8"
+                    encoding = CFStringBuiltInEncodings.UTF8.rawValue
+                } else {
+                    DispatchQueue.main.async {
+                        result(FlutterError(code: "UnsupportedCharset", message: "The detected charset \(encodingName) is not supported.", details: nil))
+                    }
+                    return
                 }
-                return
             }
 
             let nsEncoding = CFStringConvertEncodingToNSStringEncoding(encoding)
@@ -67,6 +73,8 @@ public class SwiftFlutterCharsetDetectorPlugin: NSObject, FlutterPlugin {
             // 针对 UTF-8 的容错
             if decoded == nil && encoding == CFStringBuiltInEncodings.UTF8.rawValue {
                 decoded = String(decoding: inputData, as: UTF8.self) as NSString
+            } else {
+                decoded = NSString(data: data.data, encoding: nsEncoding)
             }
             if decoded == nil {
                 print("The data could not be decoded, Detected charset: \(encodingName)")
