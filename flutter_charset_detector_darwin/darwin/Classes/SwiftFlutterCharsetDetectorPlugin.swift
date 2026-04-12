@@ -8,6 +8,8 @@ import Foundation
 import CoreFoundation
 
 public class SwiftFlutterCharsetDetectorPlugin: NSObject, FlutterPlugin {
+    private let decodeQueue = DispatchQueue(label: "flutter.charset.detector.decode", qos: .userInitiated)
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         #if os(iOS)
             let messenger = registrar.messenger()
@@ -39,44 +41,59 @@ public class SwiftFlutterCharsetDetectorPlugin: NSObject, FlutterPlugin {
             result(FlutterError(code: "MissingArg", message: "Required argument missing", details: "\(call.method) requires 'data'"))
             return
         }
-        // Elsewhere in the plugin we use the term "charset" instead of
-        // "encoding", but for consistency with iOS APIs we use the term in a
-        // limited capacity here
-        guard let encodingName = UniversalDetector.encodingAsString(with: data.data) else {
-            result(FlutterError(code: "DetectionFailed", message: "The charset could not be detected", details: nil))
-            return
-        }
-        let encoding = CFStringConvertIANACharSetNameToEncoding(encodingName as CFString)
-        guard encoding != kCFStringEncodingInvalidId else {
-            result(FlutterError(code: "UnsupportedCharset", message: "The detected charset \(encodingName) is not supported.", details: nil))
-            return
-        }
-        let nsEncoding = CFStringConvertEncodingToNSStringEncoding(encoding)
-        var decoded: NSString?
+        let inputData = data.data
+        decodeQueue.async {
+            // Elsewhere in the plugin we use the term "charset" instead of
+            // "encoding", but for consistency with iOS APIs we use the term in a
+            // limited capacity here
+            guard let encodingName = UniversalDetector.encodingAsString(with: inputData) else {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "DetectionFailed", message: "The charset could not be detected", details: nil))
+                }
+                return
+            }
 
-        // 针对 UTF-8 的容错
-        if decoded == nil && encoding == CFStringBuiltInEncodings.UTF8.rawValue {
-            decoded = String(decoding: data.data, as: UTF8.self) as NSString
-        }
-        if decoded == nil {
-            print("The data could not be decoded, Detected charset: \(encodingName)")
-            if encodingName == "GB18030" {
-                // 尝试修复 GB18030 编码
-                let correctedData = dataByHealingGB18030Stream(data: data.data)
-                decoded = NSString(data: correctedData, encoding: nsEncoding)
-                if decoded == nil {
-                    print("The data could not be fix, Detected charset: \(encodingName)")
+            let encoding = CFStringConvertIANACharSetNameToEncoding(encodingName as CFString)
+            guard encoding != kCFStringEncodingInvalidId else {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "UnsupportedCharset", message: "The detected charset \(encodingName) is not supported.", details: nil))
+                }
+                return
+            }
+
+            let nsEncoding = CFStringConvertEncodingToNSStringEncoding(encoding)
+            var decoded: NSString?
+
+            // 针对 UTF-8 的容错
+            if decoded == nil && encoding == CFStringBuiltInEncodings.UTF8.rawValue {
+                decoded = String(decoding: inputData, as: UTF8.self) as NSString
+            }
+            if decoded == nil {
+                print("The data could not be decoded, Detected charset: \(encodingName)")
+                if encodingName == "GB18030" {
+                    // 尝试修复 GB18030 编码
+                    let correctedData = self.dataByHealingGB18030Stream(data: inputData)
+                    decoded = NSString(data: correctedData, encoding: nsEncoding)
+                    if decoded == nil {
+                        print("The data could not be fix, Detected charset: \(encodingName)")
+                    }
                 }
             }
+
+            guard let decoded else {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "DecodingFailed", message: "The data could not be decoded", details: "Detected charset: \(encodingName)"))
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                result([
+                    "charset": encodingName,
+                    "string": decoded
+                ])
+            }
         }
-        if decoded == nil {
-            result(FlutterError(code: "DecodingFailed", message: "The data could not be decoded", details: "Detected charset: \(encodingName)"))
-            return
-        }
-        result([
-            "charset": encodingName,
-            "string": decoded
-        ])
     }
 
     func handleDetect(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
