@@ -1,5 +1,7 @@
 package com.madlonkay.flutter_charset_detector
 
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -11,10 +13,14 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.nio.charset.IllegalCharsetNameException
 import java.nio.charset.UnsupportedCharsetException
+import java.util.concurrent.Executors
+import kotlin.math.max
 
 /** FlutterCharsetDetectorPlugin */
 class FlutterCharsetDetectorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private val executor = Executors.newFixedThreadPool(2)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_charset_detector")
@@ -35,30 +41,38 @@ class FlutterCharsetDetectorPlugin : FlutterPlugin, MethodCallHandler {
             result.error("MissingArg", "Required argument missing", "${call.method} requires 'data'")
             return
         }
-        val charsetName = data.inputStream().use(UniversalDetector::detectCharset)
-        if (charsetName == null) {
-            result.error("DetectionFailed", "The charset could not be detected", null)
-            return
-        }
-        val charset: Charset = try {
-            Charset.forName(charsetName)
-        } catch (e: Exception) {
-            when (e) {
-                is IllegalCharsetNameException,
-                is UnsupportedCharsetException -> {
-                    result.error("UnsupportedCharset", "The detected charset $charsetName is not supported.", null)
-                    return
+        executor.execute {
+            val charsetName = data.inputStream().use(UniversalDetector::detectCharset)
+            if (charsetName == null) {
+                mainHandler.post {
+                    result.error("DetectionFailed", "The charset could not be detected", null)
                 }
-                else -> throw e
+                return@execute
+            }
+            val charset: Charset = try {
+                Charset.forName(charsetName)
+            } catch (e: Exception) {
+                when (e) {
+                    is IllegalCharsetNameException,
+                    is UnsupportedCharsetException -> {
+                        mainHandler.post {
+                            result.error("UnsupportedCharset", "The detected charset $charsetName is not supported.", null)
+                        }
+                        return@execute
+                    }
+                    else -> throw e
+                }
+            }
+            val string = charset.decode(ByteBuffer.wrap(data)).toString()
+            mainHandler.post {
+                result.success(
+                    mapOf(
+                        "charset" to charsetName,
+                        "string" to string
+                    )
+                )
             }
         }
-        val string = charset.decode(ByteBuffer.wrap(data)).toString()
-        result.success(
-            mapOf(
-                "charset" to charsetName,
-                "string" to string
-            )
-        )
     }
 
     private fun handleDetect(call: MethodCall, result: Result) {
@@ -67,12 +81,18 @@ class FlutterCharsetDetectorPlugin : FlutterPlugin, MethodCallHandler {
             result.error("MissingArg", "Required argument missing", "${call.method} requires 'data'")
             return
         }
-        val charsetName = data.inputStream().use(UniversalDetector::detectCharset)
-        if (charsetName == null) {
-            result.error("DetectionFailed", "The charset could not be detected", null)
-            return
+        executor.execute {
+            val charsetName = data.inputStream().use(UniversalDetector::detectCharset)
+            if (charsetName == null) {
+                mainHandler.post {
+                    result.error("DetectionFailed", "The charset could not be detected", null)
+                }
+                return@execute
+            }
+            mainHandler.post {
+                result.success(charsetName)
+            }
         }
-        result.success(charsetName)
     }
 
     override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
